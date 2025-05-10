@@ -1,25 +1,75 @@
-import logo from './logo.svg';
+import React, { useEffect, useState } from 'react';
+import { fetchCats } from './services/CatServices';
+import Gallery from './components/Gallery';
+import Modal from './components/Modal';
+import config from './config';
 import './App.css';
 
-function App() {
+const App = () => {
+  const [cats, setCats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalUrl, setModalUrl] = useState(null);
+  const [limit, setLimit] = useState(() => {
+    const saved = localStorage.getItem('catImageLimit');
+    return saved ? parseInt(saved, 10) : config.IMAGE_LIMIT;
+  });
+  const hasApiKey = !!process.env.REACT_APP_API_KEY;
+
+  const increaseLimit = () => setLimit((prev) => Math.min(prev + 1, 20));
+  const decreaseLimit = () => setLimit((prev) => Math.max(prev - 1, 1));
+
+  useEffect(() => {
+    localStorage.setItem('catImageLimit', limit.toString());
+  }, [limit]);
+
+  useEffect(() => {
+    document.body.style.overflow = modalUrl ? 'hidden' : 'auto';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [modalUrl]);
+
+  const loadCats = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchCats(limit);
+      setCats(data);
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadCats();
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [limit]);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app">
+      {hasApiKey ? (
+        <div className="counter-control">
+          <button onClick={decreaseLimit}>−</button>
+          <span>{limit}</span>
+          <button onClick={increaseLimit}>＋</button>
+        </div>
+      ) : (
+        <div className="counter-control disabled">
+          <span style={{ color: '#FF0000', marginTop: "10px" }}>API key not set</span>
+        </div>
+      )}
+      <button className="sticky-refresh" onClick={loadCats}>Refresh cats</button>
+      {loading ? (
+        <div className="loader">Loading...</div>
+      ) : (
+        <Gallery images={cats} onImageClick={setModalUrl} />
+      )}
+      <Modal imageUrl={modalUrl} onClose={() => setModalUrl(null)} />
     </div>
   );
-}
+};
 
 export default App;
